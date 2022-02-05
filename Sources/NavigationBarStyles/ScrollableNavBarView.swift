@@ -11,57 +11,66 @@ import SwiftUI
 internal struct ScrollableNavBarView: View {
     @Binding private var selection: Int
     @State private var switchAppeared: Bool = false
-
+    
     @EnvironmentObject private var dataStore: DataStore
-
+    
     public init(selection: Binding<Int>) {
         self._selection = selection
     }
-
+    
     var body: some View {
-        ScrollViewReader { value in
-            ScrollView(.horizontal, showsIndicators: false) {
-                VStack {
-                    HStack(spacing: style.tabItemSpacing) {
-                        if dataStore.itemsCount > 0 {
-                            ForEach(0..<dataStore.itemsCount, id: \.self) { idx in
-                                NavBarItem(id: idx, selection: $selection)
+        HStack {
+            ScrollViewReader { value in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    VStack {
+                        HStack(spacing: style.tabItemSpacing) {
+                            if dataStore.itemsCount > 0 {
+                                ForEach(0..<dataStore.itemsCount, id: \.self) { idx in
+                                    NavBarItem(id: idx, selection: $selection)
+                                }
                             }
                         }
+                        IndicatorScrollableBarView(selection: $selection)
                     }
-                    IndicatorScrollableBarView(selection: $selection)
+                    .frame(height: self.style.tabItemHeight)
                 }
-                .frame(height: self.style.tabItemHeight)
+                .onChange(of: switchAppeared) { _ in
+                    // This is necessary because anchor: .center is not working correctly
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        var remainingItemsWidth = dataStore.items[selection]?.itemWidth ?? 0 / 2
+                        let items = dataStore.items.filter { index, _ in
+                            index > selection
+                        }
+                        remainingItemsWidth += items.map({return $0.value.itemWidth ?? 0}).reduce(0, +)
+                        remainingItemsWidth += CGFloat(dataStore.items.count-1 - selection)*style.tabItemSpacing
+                        let centerSel = remainingItemsWidth > settings.width/2
+                        if centerSel {
+                            value.scrollTo(selection, anchor: .center)
+                        } else {
+                            value.scrollTo(dataStore.items.count-1)
+                        }
+                    }
+                }
+                .onChange(of: self.selection) { newSelection in
+                    withAnimation {
+                        value.scrollTo(newSelection, anchor: .center)
+                    }
+                }
             }
-            .padding(self.style.padding)
-            .onChange(of: switchAppeared) { _ in
-                // This is necessary because anchor: .center is not working correctly
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    var remainingItemsWidth = dataStore.items[selection]?.itemWidth ?? 0 / 2
-                    let items = dataStore.items.filter { index, _ in
-                        index > selection
-                    }
-                    remainingItemsWidth += items.map({return $0.value.itemWidth ?? 0}).reduce(0, +)
-                    remainingItemsWidth += CGFloat(dataStore.items.count-1 - selection)*style.tabItemSpacing
-                    let centerSel = remainingItemsWidth > settings.width/2
-                    if centerSel {
-                        value.scrollTo(selection, anchor: .center)
-                    } else {
-                        value.scrollTo(dataStore.items.count-1)
-                    }
-                }
+            .onAppear {
+                switchAppeared = !switchAppeared
             }
-            .onChange(of: self.selection) { newSelection in
-                withAnimation {
-                    value.scrollTo(newSelection, anchor: .center)
-                }
+            if let content = dataStore.addItemContent {
+                content
+                    .onTapGesture {
+                        dataStore.addItemAction?()
+                    }
+                    .frame(height: self.style.tabItemHeight, alignment: .top)
             }
         }
-        .onAppear {
-            switchAppeared = !switchAppeared
-        }
+        .padding(self.style.padding)
     }
-
+    
     @Environment(\.pagerStyle) var style: PagerStyle
     @EnvironmentObject private var settings: PagerSettings
 }
@@ -72,11 +81,11 @@ internal struct IndicatorScrollableBarView: View {
     @State private var position: Double = 0
     @State private var selectedItemWidth: Double = 0
     @State private var appeared: Bool = false
-
+    
     public init(selection: Binding<Int>) {
         self._selection = selection
     }
-
+    
     var body: some View {
         Rectangle()
             .fill(style.indicatorBarColor)
@@ -103,7 +112,7 @@ internal struct IndicatorScrollableBarView: View {
                 let items = dataStore.items.filter { index, _ in
                     index < selection
                 }
-
+                
                 let spaces = style.tabItemSpacing * CGFloat(selection-1)
                 let actualWidth = dataStore.items[selection]?.itemWidth ?? 0
                 var lastPosition = items.map({return $0.value.itemWidth ?? 0}).reduce(0, +)
@@ -123,14 +132,14 @@ internal struct IndicatorScrollableBarView: View {
                         nextPosition -= ((dataStore.items[selection - 1])?.itemWidth ?? 0)/2
                     }
                     position = lastPosition + (nextPosition - lastPosition)*abs(percentage)
-
+                    
                     if let selectedWidth = dataStore.items[selection]?.itemWidth,
-                        let nextWidth = percentage > 0 ? dataStore.items[selection-1]?.itemWidth : dataStore.items[selection+1]?.itemWidth,
-                        abs(percentage)>0 {
+                       let nextWidth = percentage > 0 ? dataStore.items[selection-1]?.itemWidth : dataStore.items[selection+1]?.itemWidth,
+                       abs(percentage)>0 {
                         selectedItemWidth = selectedWidth - (selectedWidth-nextWidth)*abs(percentage)
                     }
                 }
-
+                
             }
             .onChange(of: selection) { newValue in
                 let items = dataStore.items.filter { index, _ in
@@ -141,8 +150,8 @@ internal struct IndicatorScrollableBarView: View {
                 newPosition += (style.tabItemSpacing * CGFloat(newValue)) + selectedItemWidth/2
                 position = newPosition
             }
-        }
-
+    }
+    
     @Environment(\.pagerStyle) var style: PagerStyle
     @EnvironmentObject private var settings: PagerSettings
 }

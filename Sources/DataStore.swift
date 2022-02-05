@@ -29,6 +29,9 @@ class DataStore: ObservableObject {
 
     @Published private(set) var itemsCount: Int = 0
     @Published var widthUpdated: Bool = false
+    
+    @Published var addItemContent: AnyView?
+    @Published var addItemAction: (() -> Void)?
 
     func setView(_ view: AnyView, at index: Int) {
         if let item = items[index] {

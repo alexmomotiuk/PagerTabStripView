@@ -14,16 +14,17 @@ class PagerSettings: ObservableObject {
 @available(iOS 14.0, *)
 public struct PagerTabStripView<Content>: View where Content: View {
     private var content: () -> Content
-
+    
     @Binding private var selectionBiding: Int
     @State private var selectionState = 0
     @StateObject private var settings: PagerSettings
     private var useBinding: Bool
     private let swipeGestureEnabled: Bool
-
+    
     public init(swipeGestureEnabled: Bool = true,
                 selection: Binding<Int>? = nil,
                 @ViewBuilder content: @escaping () -> Content) {
+        
         self.content = content
         if let selection = selection {
             useBinding = true
@@ -35,16 +36,79 @@ public struct PagerTabStripView<Content>: View where Content: View {
         self.swipeGestureEnabled = swipeGestureEnabled
         self._settings = StateObject(wrappedValue: PagerSettings())
     }
-
+    
     public var body: some View {
-        WrapperPagerTabStripView(swipeGestureEnabled: swipeGestureEnabled,
+        WrapperPagerTabStripView<Content, AnyView>(swipeGestureEnabled: swipeGestureEnabled,
                                  selection: useBinding ? $selectionBiding : $selectionState,
+                                 addTabItemContent: nil,
+                                 addTabItemAction: nil,
                                  content: content)
             .environmentObject(self.settings)
     }
 }
 
-private struct WrapperPagerTabStripView<Content>: View where Content: View {
+
+@available(iOS 14.0, *)
+public struct PagerAddTabStripView<Content, AddTabItemContent>: View where Content: View, AddTabItemContent: View {
+    private var content: () -> Content
+
+    @Binding private var selectionBiding: Int
+    @State private var selectionState = 0
+    @StateObject private var settings: PagerSettings
+    private var useBinding: Bool
+    private let swipeGestureEnabled: Bool
+    
+    private var addTabItemContent: (() -> AddTabItemContent)?
+    private var addTabItemAction: (() -> Void)?
+
+    public init(swipeGestureEnabled: Bool = true,
+                selection: Binding<Int>? = nil,
+                @ViewBuilder content: @escaping () -> Content) {
+        
+        self.content = content
+        if let selection = selection {
+            useBinding = true
+            self._selectionBiding = selection
+        } else {
+            useBinding = false
+            self._selectionBiding = .constant(0)
+        }
+        self.swipeGestureEnabled = swipeGestureEnabled
+        self._settings = StateObject(wrappedValue: PagerSettings())
+        self.addTabItemContent = nil
+        self.addTabItemAction = nil
+    }
+    
+    public init(swipeGestureEnabled: Bool = true,
+                selection: Binding<Int>? = nil,
+                addTabItemContent: (() -> AddTabItemContent)? = nil,
+                addTabItemAction: (() -> Void)? = nil,
+                @ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+        if let selection = selection {
+            useBinding = true
+            self._selectionBiding = selection
+        } else {
+            useBinding = false
+            self._selectionBiding = .constant(0)
+        }
+        self.swipeGestureEnabled = swipeGestureEnabled
+        self._settings = StateObject(wrappedValue: PagerSettings())
+        self.addTabItemContent = addTabItemContent
+        self.addTabItemAction = addTabItemAction
+    }
+
+    public var body: some View {
+        WrapperPagerTabStripView(swipeGestureEnabled: swipeGestureEnabled,
+                                 selection: useBinding ? $selectionBiding : $selectionState,
+                                 addTabItemContent: addTabItemContent,
+                                 addTabItemAction: addTabItemAction,
+                                 content: content)
+            .environmentObject(self.settings)
+    }
+}
+
+private struct WrapperPagerTabStripView<Content, AddTabItemContent>: View where Content: View, AddTabItemContent: View {
 
     private var content: () -> Content
 
@@ -67,13 +131,19 @@ private struct WrapperPagerTabStripView<Content>: View where Content: View {
     @GestureState private var translation: CGFloat = 0
 
     private let swipeGestureEnabled: Bool
+    private let addTabItemContent: (() -> AddTabItemContent)?
+    private let addTabItemAction: (() -> Void)?
 
     public init(swipeGestureEnabled: Bool = true,
                 selection: Binding<Int>,
+                addTabItemContent: (() -> AddTabItemContent)?,
+                addTabItemAction: (() -> Void)?,
                 @ViewBuilder content: @escaping () -> Content) {
         self.swipeGestureEnabled = swipeGestureEnabled
         self.content = content
         self._selection = selection
+        self.addTabItemContent = addTabItemContent
+        self.addTabItemAction = addTabItemAction
     }
 
     public var body: some View {
@@ -122,6 +192,8 @@ private struct WrapperPagerTabStripView<Content>: View where Content: View {
                 let geo = gproxy.frame(in: .local)
                 self.settings.width = geo.width
                 self.currentOffset = -(CGFloat(selection) * geo.width)
+                self.dataStore.addItemContent = AnyView(addTabItemContent?())
+                self.dataStore.addItemAction = addTabItemAction
             })
             .onChange(of: gproxy.frame(in: .local), perform: { geo in
                 self.settings.width = geo.width

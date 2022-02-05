@@ -24,7 +24,26 @@ struct TwitterView: View {
     }
 
     var body: some View {
-        PagerTabStripView(swipeGestureEnabled: swipeGestureEnabled, selection: $selection) {
+        PagerAddTabStripView(swipeGestureEnabled: swipeGestureEnabled,
+                          selection: $selection,
+                          addTabItemContent: {
+            HStack {
+                Image(systemName: "plus.circle")
+                    .renderingMode(.template)
+                    .imageScale(.large)
+                    .foregroundColor(.black)
+                    .padding(.leading, 8)
+            }
+            
+        }, addTabItemAction: {
+            print("TEst")
+        }) {
+            Color.red.pagerTabItem {
+                TwitterNavBarItem(title: "First big width")
+            }
+            Color.green.pagerTabItem {
+                TwitterNavBarItem(title: "First big width")
+            }
             PostsList(isLoading: $firstModel.isLoading, items: firstModel.posts).pagerTabItem {
                 TwitterNavBarItem(title: "First big width")
             }
